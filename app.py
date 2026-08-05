@@ -234,7 +234,10 @@ def draw_chatbot():
     llm_media_df['CVR(%)'] = np.where(llm_media_df['클릭'] > 0, (llm_media_df['결제건수'] / llm_media_df['클릭'] * 100).round(2), 0.0)
     
     # Drop raw values for compact tokens, keeping the KPIs and totals
-    media_context_table = llm_media_df[['매체', '집행 광고비', '결제거래액', 'ROAS(%)', 'CTR(%)', 'CPC(원)', 'CVR(%)']].to_markdown(index=False)
+    try:
+        media_context_table = llm_media_df[['매체', '집행 광고비', '결제거래액', 'ROAS(%)', 'CTR(%)', 'CPC(원)', 'CVR(%)']].to_markdown(index=False)
+    except Exception:
+        media_context_table = llm_media_df[['매체', '집행 광고비', '결제거래액', 'ROAS(%)', 'CTR(%)', 'CPC(원)', 'CVR(%)']].to_string(index=False)
     
     # Campaign Summary (Top 8 campaigns by spend)
     llm_camp_df = filtered_df.groupby(['제휴사명', '매체']).agg({
@@ -248,7 +251,10 @@ def draw_chatbot():
     llm_camp_df['CVR(%)'] = np.where(llm_camp_df['클릭'] > 0, (llm_camp_df['결제건수'] / llm_camp_df['클릭'] * 100).round(2), 0.0)
     llm_camp_top = llm_camp_df.sort_values(by='집행 광고비', ascending=False).head(8)
     
-    campaign_context_table = llm_camp_top[['제휴사명', '매체', '집행 광고비', '결제거래액', 'ROAS(%)', 'CVR(%)']].to_markdown(index=False)
+    try:
+        campaign_context_table = llm_camp_top[['제휴사명', '매체', '집행 광고비', '결제거래액', 'ROAS(%)', 'CVR(%)']].to_markdown(index=False)
+    except Exception:
+        campaign_context_table = llm_camp_top[['제휴사명', '매체', '집행 광고비', '결제거래액', 'ROAS(%)', 'CVR(%)']].to_string(index=False)
     
     # System Instruction Definition (AE personality & context)
     system_instruction = f"""

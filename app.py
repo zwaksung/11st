@@ -299,52 +299,43 @@ with col_dashboard:
     # Section 2: [전문가 추천] KPI 스코어카드
     # ----------------------------------------------------
     st.markdown("### 📊 **핵심 성과 지표 (KPI Scorecard)**")
-    kpi_col1, kpi_col2 = st.columns(2)
-    kpi_col3, kpi_col4 = st.columns(2)
-    kpi_col5, kpi_col6 = st.columns(2)
     
-    with kpi_col1:
-        st.metric(
-            label="집행 광고비 (Cost)",
-            value=f"₩ {curr_spend:,.0f}",
-            delta=get_delta_str(curr_spend, prev_spend),
-            delta_color="normal"
-        )
-    with kpi_col2:
-        st.metric(
-            label="결제거래액 (Revenue)",
-            value=f"₩ {curr_rev:,.0f}",
-            delta=get_delta_str(curr_rev, prev_rev),
-            delta_color="normal"
-        )
-    with kpi_col3:
-        st.metric(
-            label="평균 ROAS",
-            value=f"{curr_roas:.1f} %",
-            delta=f"{curr_roas - prev_roas:+.1f}%p",
-            delta_color="normal"
-        )
-    with kpi_col4:
-        st.metric(
-            label="클릭수 (Clicks)",
-            value=f"{curr_clicks:,.0f} 회",
-            delta=get_delta_str(curr_clicks, prev_clicks),
-            delta_color="normal"
-        )
-    with kpi_col5:
-        st.metric(
-            label="클릭율 (CTR)",
-            value=f"{curr_ctr:.2f} %",
-            delta=f"{curr_ctr - prev_ctr:+.2f}%p",
-            delta_color="normal"
-        )
-    with kpi_col6:
-        st.metric(
-            label="평균 클릭단가 (CPC)",
-            value=f"₩ {curr_cpc:,.0f}",
-            delta=get_delta_str(curr_cpc, prev_cpc, is_cpc=True),
-            delta_color="inverse"
-        )
+    st.metric(
+        label="집행 광고비 (Cost)",
+        value=f"₩ {curr_spend:,.0f}",
+        delta=get_delta_str(curr_spend, prev_spend),
+        delta_color="normal"
+    )
+    st.metric(
+        label="결제거래액 (Revenue)",
+        value=f"₩ {curr_rev:,.0f}",
+        delta=get_delta_str(curr_rev, prev_rev),
+        delta_color="normal"
+    )
+    st.metric(
+        label="평균 ROAS",
+        value=f"{curr_roas:.1f} %",
+        delta=f"{curr_roas - prev_roas:+.1f}%p",
+        delta_color="normal"
+    )
+    st.metric(
+        label="클릭수 (Clicks)",
+        value=f"{curr_clicks:,.0f} 회",
+        delta=get_delta_str(curr_clicks, prev_clicks),
+        delta_color="normal"
+    )
+    st.metric(
+        label="클릭율 (CTR)",
+        value=f"{curr_ctr:.2f} %",
+        delta=f"{curr_ctr - prev_ctr:+.2f}%p",
+        delta_color="normal"
+    )
+    st.metric(
+        label="평균 클릭단가 (CPC)",
+        value=f"₩ {curr_cpc:,.0f}",
+        delta=get_delta_str(curr_cpc, prev_cpc, is_cpc=True),
+        delta_color="inverse"
+    )
 
     st.markdown("---")
 

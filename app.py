@@ -358,289 +358,289 @@ with chatbot_widget_col:
     st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
     with st.popover("🤖 **AI Analyst 챗봇 열기**", use_container_width=True):
         draw_chatbot()
+
+# ----------------------------------------------------
+# Section 1: Executive Summary Comment
+# ----------------------------------------------------
+st.markdown("### 💡 **전일자 및 기간 핵심 성과 요약**")
+
+# Identify top media and top campaign
+top_media = "N/A"
+best_roas_media = "N/A"
+if not filtered_df.empty:
+    media_agg = filtered_df.groupby('매체').agg({'집행 광고비': 'sum', '결제거래액': 'sum'}).reset_index()
+    media_agg['ROAS'] = (media_agg['결제거래액'] / media_agg['집행 광고비'] * 100).fillna(0)
     
-    # ----------------------------------------------------
-    # Section 1: Executive Summary Comment
-    # ----------------------------------------------------
-    st.markdown("### 💡 **전일자 및 기간 핵심 성과 요약**")
+    top_media_row = media_agg.sort_values(by='결제거래액', ascending=False).iloc[0] if not media_agg.empty else None
+    best_roas_row = media_agg.sort_values(by='ROAS', ascending=False).iloc[0] if not media_agg.empty else None
     
-    # Identify top media and top campaign
-    top_media = "N/A"
-    best_roas_media = "N/A"
-    if not filtered_df.empty:
-        media_agg = filtered_df.groupby('매체').agg({'집행 광고비': 'sum', '결제거래액': 'sum'}).reset_index()
-        media_agg['ROAS'] = (media_agg['결제거래액'] / media_agg['집행 광고비'] * 100).fillna(0)
+    if top_media_row is not None:
+        top_media = f"{top_media_row['매체']} (매출 {top_media_row['결제거래액']:,.0f}원)"
+    if best_roas_row is not None:
+        best_roas_media = f"{best_roas_row['매체']} (ROAS {best_roas_row['ROAS']:.1f}%)"
         
-        top_media_row = media_agg.sort_values(by='결제거래액', ascending=False).iloc[0] if not media_agg.empty else None
-        best_roas_row = media_agg.sort_values(by='ROAS', ascending=False).iloc[0] if not media_agg.empty else None
+rule_summary = f"""현재 선택된 기간 동안 집행된 총 광고비는 **{curr_spend:,.0f}원**, 총 결제거래액은 **{curr_rev:,.0f}원**이며 평균 ROAS는 **{curr_roas:.1f}%**를 기록하고 있습니다. 
+가장 높은 매출을 창출한 매체는 **{top_media}**이며, 가장 효율이 우수한 ROAS 매체는 **{best_roas_media}**입니다. 
+이전 동기간 대비 광고비는 **{get_delta_str(curr_spend, prev_spend)}**, 매출액은 **{get_delta_str(curr_rev, prev_rev)}**, ROAS는 **{curr_roas - prev_roas:+.1f}%p** 변동하였습니다."""
+
+summary_placeholder = st.empty()
+summary_placeholder.markdown(f"""
+<div class="summary-card">
+    <div class="summary-title">📈 실시간 성과 브리핑 (Rule-Based)</div>
+    <div class="summary-text">{rule_summary}</div>
+</div>
+""", unsafe_allow_html=True)
+
+# Dynamic LLM summary generation if Gemini API key exists
+if gemini_key:
+    try:
+        # Let's perform a fast async/sync call to update the placeholder with LLM summary
+        genai.configure(api_key=gemini_key)
+        model = genai.GenerativeModel("gemini-3.5-flash")
         
-        if top_media_row is not None:
-            top_media = f"{top_media_row['매체']} (매출 {top_media_row['결제거래액']:,.0f}원)"
-        if best_roas_row is not None:
-            best_roas_media = f"{best_roas_row['매체']} (ROAS {best_roas_row['ROAS']:.1f}%)"
-            
-    rule_summary = f"""현재 선택된 기간 동안 집행된 총 광고비는 **{curr_spend:,.0f}원**, 총 결제거래액은 **{curr_rev:,.0f}원**이며 평균 ROAS는 **{curr_roas:.1f}%**를 기록하고 있습니다. 
-    가장 높은 매출을 창출한 매체는 **{top_media}**이며, 가장 효율이 우수한 ROAS 매체는 **{best_roas_media}**입니다. 
-    이전 동기간 대비 광고비는 **{get_delta_str(curr_spend, prev_spend)}**, 매출액은 **{get_delta_str(curr_rev, prev_rev)}**, ROAS는 **{curr_roas - prev_roas:+.1f}%p** 변동하였습니다."""
+        prompt_summary = f"""
+        너는 10년 차 광고 대행사 AE이자 퍼포먼스 마케팅 디렉터야. 
+        아래 제공된 데이터를 바탕으로 광고주에게 보낼 '전일자 및 선택 기간 핵심 성과 브리핑 요약'을 작성해 줘.
+        데이터 수치에 완전히 근거해야 하며, 전문적인 톤앤매너로 작성하되 3문장 이내로 명확하게 브리핑해 줘.
+        
+        [조회 데이터 세부 요약]
+        - 조회 기간: {start_date} ~ {end_date}
+        - 집행 광고비: {curr_spend:,.0f}원 (이전 동기 대비 {get_delta_str(curr_spend, prev_spend)})
+        - 결제거래액: {curr_rev:,.0f}원 (이전 동기 대비 {get_delta_str(curr_rev, prev_rev)})
+        - 평균 ROAS: {curr_roas:.1f}% (이전 동기 대비 {curr_roas - prev_roas:+.1f}%p 변동)
+        - 탑 매출 매체: {top_media}
+        - 최고 효율 매체: {best_roas_media}
+        """
+        
+        # Use brief timeout or fast generate
+        response = model.generate_content(prompt_summary)
+        llm_brief = response.text
+        
+        summary_placeholder.markdown(f"""
+        <div class="summary-card">
+            <div class="summary-title">✨ AI 실시간 성과 인사이트 브리핑</div>
+            <div class="summary-text">{llm_brief}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    except Exception as e:
+        # Fallback quietly to rule-based summary
+        pass
 
-    summary_placeholder = st.empty()
-    summary_placeholder.markdown(f"""
-    <div class="summary-card">
-        <div class="summary-title">📈 실시간 성과 브리핑 (Rule-Based)</div>
-        <div class="summary-text">{rule_summary}</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Dynamic LLM summary generation if Gemini API key exists
-    if gemini_key:
-        try:
-            # Let's perform a fast async/sync call to update the placeholder with LLM summary
-            genai.configure(api_key=gemini_key)
-            model = genai.GenerativeModel("gemini-3.5-flash")
-            
-            prompt_summary = f"""
-            너는 10년 차 광고 대행사 AE이자 퍼포먼스 마케팅 디렉터야. 
-            아래 제공된 데이터를 바탕으로 광고주에게 보낼 '전일자 및 선택 기간 핵심 성과 브리핑 요약'을 작성해 줘.
-            데이터 수치에 완전히 근거해야 하며, 전문적인 톤앤매너로 작성하되 3문장 이내로 명확하게 브리핑해 줘.
-            
-            [조회 데이터 세부 요약]
-            - 조회 기간: {start_date} ~ {end_date}
-            - 집행 광고비: {curr_spend:,.0f}원 (이전 동기 대비 {get_delta_str(curr_spend, prev_spend)})
-            - 결제거래액: {curr_rev:,.0f}원 (이전 동기 대비 {get_delta_str(curr_rev, prev_rev)})
-            - 평균 ROAS: {curr_roas:.1f}% (이전 동기 대비 {curr_roas - prev_roas:+.1f}%p 변동)
-            - 탑 매출 매체: {top_media}
-            - 최고 효율 매체: {best_roas_media}
-            """
-            
-            # Use brief timeout or fast generate
-            response = model.generate_content(prompt_summary)
-            llm_brief = response.text
-            
-            summary_placeholder.markdown(f"""
-            <div class="summary-card">
-                <div class="summary-title">✨ AI 실시간 성과 인사이트 브리핑</div>
-                <div class="summary-text">{llm_brief}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        except Exception as e:
-            # Fallback quietly to rule-based summary
-            pass
+# ----------------------------------------------------
+# Section 2: [전문가 추천] KPI 스코어카드 (3열 2줄)
+# ----------------------------------------------------
+st.markdown("### 📊 **핵심 성과 지표 (KPI Scorecard)**")
+kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
+kpi_col4, kpi_col5, kpi_col6 = st.columns(3)
 
-    # ----------------------------------------------------
-    # Section 2: [전문가 추천] KPI 스코어카드 (3열 2줄)
-    # ----------------------------------------------------
-    st.markdown("### 📊 **핵심 성과 지표 (KPI Scorecard)**")
-    kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
-    kpi_col4, kpi_col5, kpi_col6 = st.columns(3)
-    
-    with kpi_col1:
-        st.metric(
-            label="집행 광고비 (Cost)",
-            value=f"₩ {curr_spend:,.0f}",
-            delta=get_delta_str(curr_spend, prev_spend),
-            delta_color="normal"
-        )
-    with kpi_col2:
-        st.metric(
-            label="결제거래액 (Revenue)",
-            value=f"₩ {curr_rev:,.0f}",
-            delta=get_delta_str(curr_rev, prev_rev),
-            delta_color="normal"
-        )
-    with kpi_col3:
-        st.metric(
-            label="평균 ROAS",
-            value=f"{curr_roas:.1f} %",
-            delta=f"{curr_roas - prev_roas:+.1f}%p",
-            delta_color="normal"
-        )
-    with kpi_col4:
-        st.metric(
-            label="클릭수 (Clicks)",
-            value=f"{curr_clicks:,.0f} 회",
-            delta=get_delta_str(curr_clicks, prev_clicks),
-            delta_color="normal"
-        )
-    with kpi_col5:
-        st.metric(
-            label="클릭율 (CTR)",
-            value=f"{curr_ctr:.2f} %",
-            delta=f"{curr_ctr - prev_ctr:+.2f}%p",
-            delta_color="normal"
-        )
-    with kpi_col6:
-        st.metric(
-            label="평균 클릭단가 (CPC)",
-            value=f"₩ {curr_cpc:,.0f}",
-            delta=get_delta_str(curr_cpc, prev_cpc, is_cpc=True),
-            delta_color="inverse"
-        )
+with kpi_col1:
+    st.metric(
+        label="집행 광고비 (Cost)",
+        value=f"₩ {curr_spend:,.0f}",
+        delta=get_delta_str(curr_spend, prev_spend),
+        delta_color="normal"
+    )
+with kpi_col2:
+    st.metric(
+        label="결제거래액 (Revenue)",
+        value=f"₩ {curr_rev:,.0f}",
+        delta=get_delta_str(curr_rev, prev_rev),
+        delta_color="normal"
+    )
+with kpi_col3:
+    st.metric(
+        label="평균 ROAS",
+        value=f"{curr_roas:.1f} %",
+        delta=f"{curr_roas - prev_roas:+.1f}%p",
+        delta_color="normal"
+    )
+with kpi_col4:
+    st.metric(
+        label="클릭수 (Clicks)",
+        value=f"{curr_clicks:,.0f} 회",
+        delta=get_delta_str(curr_clicks, prev_clicks),
+        delta_color="normal"
+    )
+with kpi_col5:
+    st.metric(
+        label="클릭율 (CTR)",
+        value=f"{curr_ctr:.2f} %",
+        delta=f"{curr_ctr - prev_ctr:+.2f}%p",
+        delta_color="normal"
+    )
+with kpi_col6:
+    st.metric(
+        label="평균 클릭단가 (CPC)",
+        value=f"₩ {curr_cpc:,.0f}",
+        delta=get_delta_str(curr_cpc, prev_cpc, is_cpc=True),
+        delta_color="inverse"
+    )
 
-    st.markdown("---")
+st.markdown("---")
 
-    # ----------------------------------------------------
-    # Section 3: 데일리 성과 추이 그래프 (시계열)
-    # ----------------------------------------------------
-    st.markdown("### 📈 **데일리 성과 추이 분석**")
+# ----------------------------------------------------
+# Section 3: 데일리 성과 추이 그래프 (시계열)
+# ----------------------------------------------------
+st.markdown("### 📈 **데일리 성과 추이 분석**")
+
+daily_grouped = filtered_df.groupby('일자').agg({
+    '집행 광고비': 'sum',
+    '결제거래액': 'sum',
+    '노출': 'sum',
+    '클릭': 'sum',
+    '결제건수': 'sum'
+}).reset_index()
+
+daily_grouped['ROAS'] = np.where(daily_grouped['집행 광고비'] > 0, (daily_grouped['결제거래액'] / daily_grouped['집행 광고비']) * 100, 0.0)
+daily_grouped['CTR'] = np.where(daily_grouped['노출'] > 0, (daily_grouped['클릭'] / daily_grouped['노출']) * 100, 0.0)
+daily_grouped['CPC'] = np.where(daily_grouped['클릭'] > 0, daily_grouped['집행 광고비'] / daily_grouped['클릭'], 0.0)
+
+# Toggle metrics for lines
+selected_metrics = st.multiselect(
+    "분석 대상 지표 선택 (다중 선택 가능)",
+    options=['집행 광고비', '결제거래액', 'ROAS', '클릭', 'CTR', 'CPC'],
+    default=['집행 광고비', '결제거래액']
+)
+
+if not daily_grouped.empty and selected_metrics:
+    fig_trend = go.Figure()
     
-    daily_grouped = filtered_df.groupby('일자').agg({
-        '집행 광고비': 'sum',
-        '결제거래액': 'sum',
-        '노출': 'sum',
-        '클릭': 'sum',
-        '결제건수': 'sum'
-    }).reset_index()
+    # Determine if we have multiple units (currency vs. percent)
+    # For simplicity, if we mix ROAS/CTR with currency, we plot on secondary axes or standardize.
+    for metric in selected_metrics:
+        if metric in ['ROAS', 'CTR']:
+            fig_trend.add_trace(go.Scatter(
+                x=daily_grouped['일자'],
+                y=daily_grouped[metric],
+                name=metric,
+                mode='lines+markers',
+                line=dict(width=2),
+                hovertemplate="%{x|%Y-%m-%d}<br>" + metric + ": %{y:.2f}%"
+            ))
+        elif metric in ['CPC']:
+            fig_trend.add_trace(go.Scatter(
+                x=daily_grouped['일자'],
+                y=daily_grouped[metric],
+                name=metric,
+                mode='lines+markers',
+                line=dict(width=2),
+                hovertemplate="%{x|%Y-%m-%d}<br>" + metric + ": ₩%{y:,.0f}"
+            ))
+        else:
+            fig_trend.add_trace(go.Scatter(
+                x=daily_grouped['일자'],
+                y=daily_grouped[metric],
+                name=metric,
+                mode='lines',
+                line=dict(width=2.5),
+                hovertemplate="%{x|%Y-%m-%d}<br>" + metric + ": ₩%{y:,.0f}"
+            ))
+            
+    fig_trend.update_layout(
+        template="plotly_white",
+        margin=dict(l=40, r=40, t=20, b=40),
+        hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        xaxis=dict(showgrid=True, gridcolor="#F1F3F5"),
+        yaxis=dict(showgrid=True, gridcolor="#F1F3F5", title="지표 단위 (원 / % / 회)")
+    )
+    st.plotly_chart(fig_trend, use_container_width=True)
+else:
+    st.info("시계열 그래프를 그릴 지표를 선택해 주세요.")
+
+# ----------------------------------------------------
+# Section 4: 매체별 결제거래액 & ROAS 비교 그래프 (이중축 콤보 차트)
+# ----------------------------------------------------
+st.markdown("### 📊 **매체별 결제거래액 & ROAS 비교**")
+
+media_grouped = filtered_df.groupby('매체').agg({
+    '집행 광고비': 'sum',
+    '결제거래액': 'sum'
+}).reset_index()
+media_grouped['ROAS'] = np.where(media_grouped['집행 광고비'] > 0, (media_grouped['결제거래액'] / media_grouped['집행 광고비']) * 100, 0.0)
+
+if not media_grouped.empty:
+    # Sort by Transaction Amount (결제거래액)
+    media_grouped = media_grouped.sort_values(by='결제거래액', ascending=False)
     
-    daily_grouped['ROAS'] = np.where(daily_grouped['집행 광고비'] > 0, (daily_grouped['결제거래액'] / daily_grouped['집행 광고비']) * 100, 0.0)
-    daily_grouped['CTR'] = np.where(daily_grouped['노출'] > 0, (daily_grouped['클릭'] / daily_grouped['노출']) * 100, 0.0)
-    daily_grouped['CPC'] = np.where(daily_grouped['클릭'] > 0, daily_grouped['집행 광고비'] / daily_grouped['클릭'], 0.0)
+    fig_combo = make_subplots(specs=[[{"secondary_y": True}]])
     
-    # Toggle metrics for lines
-    selected_metrics = st.multiselect(
-        "분석 대상 지표 선택 (다중 선택 가능)",
-        options=['집행 광고비', '결제거래액', 'ROAS', '클릭', 'CTR', 'CPC'],
-        default=['집행 광고비', '결제거래액']
+    # Bar chart for Revenue
+    fig_combo.add_trace(
+        go.Bar(
+            x=media_grouped['매체'],
+            y=media_grouped['결제거래액'],
+            name="결제거래액 (Revenue)",
+            marker_color="#FF4B4B",
+            hovertemplate="매체: %{x}<br>거래액: ₩%{y:,.0f}"
+        ),
+        secondary_y=False
     )
     
-    if not daily_grouped.empty and selected_metrics:
-        fig_trend = go.Figure()
-        
-        # Determine if we have multiple units (currency vs. percent)
-        # For simplicity, if we mix ROAS/CTR with currency, we plot on secondary axes or standardize.
-        for metric in selected_metrics:
-            if metric in ['ROAS', 'CTR']:
-                fig_trend.add_trace(go.Scatter(
-                    x=daily_grouped['일자'],
-                    y=daily_grouped[metric],
-                    name=metric,
-                    mode='lines+markers',
-                    line=dict(width=2),
-                    hovertemplate="%{x|%Y-%m-%d}<br>" + metric + ": %{y:.2f}%"
-                ))
-            elif metric in ['CPC']:
-                fig_trend.add_trace(go.Scatter(
-                    x=daily_grouped['일자'],
-                    y=daily_grouped[metric],
-                    name=metric,
-                    mode='lines+markers',
-                    line=dict(width=2),
-                    hovertemplate="%{x|%Y-%m-%d}<br>" + metric + ": ₩%{y:,.0f}"
-                ))
-            else:
-                fig_trend.add_trace(go.Scatter(
-                    x=daily_grouped['일자'],
-                    y=daily_grouped[metric],
-                    name=metric,
-                    mode='lines',
-                    line=dict(width=2.5),
-                    hovertemplate="%{x|%Y-%m-%d}<br>" + metric + ": ₩%{y:,.0f}"
-                ))
-                
-        fig_trend.update_layout(
-            template="plotly_white",
-            margin=dict(l=40, r=40, t=20, b=40),
-            hovermode="x unified",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            xaxis=dict(showgrid=True, gridcolor="#F1F3F5"),
-            yaxis=dict(showgrid=True, gridcolor="#F1F3F5", title="지표 단위 (원 / % / 회)")
-        )
-        st.plotly_chart(fig_trend, use_container_width=True)
-    else:
-        st.info("시계열 그래프를 그릴 지표를 선택해 주세요.")
+    # Line chart for ROAS
+    fig_combo.add_trace(
+        go.Scatter(
+            x=media_grouped['매체'],
+            y=media_grouped['ROAS'],
+            name="ROAS (%)",
+            mode="lines+markers",
+            line=dict(color="#FF8F00", width=3),
+            marker=dict(size=8),
+            hovertemplate="매체: %{x}<br>ROAS: %{y:.1f}%"
+        ),
+        secondary_y=True
+    )
+    
+    fig_combo.update_layout(
+        template="plotly_white",
+        margin=dict(l=40, r=40, t=20, b=40),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        xaxis=dict(showgrid=False),
+        yaxis=dict(title="결제거래액 (원)", showgrid=True, gridcolor="#F1F3F5"),
+        yaxis2=dict(title="ROAS (%)", showgrid=False, overlaying="y", side="right")
+    )
+    st.plotly_chart(fig_combo, use_container_width=True)
+else:
+    st.info("데이터가 없습니다.")
 
-    # ----------------------------------------------------
-    # Section 4: 매체별 결제거래액 & ROAS 비교 그래프 (이중축 콤보 차트)
-    # ----------------------------------------------------
-    st.markdown("### 📊 **매체별 결제거래액 & ROAS 비교**")
-    
-    media_grouped = filtered_df.groupby('매체').agg({
-        '집행 광고비': 'sum',
-        '결제거래액': 'sum'
-    }).reset_index()
-    media_grouped['ROAS'] = np.where(media_grouped['집행 광고비'] > 0, (media_grouped['결제거래액'] / media_grouped['집행 광고비']) * 100, 0.0)
-    
-    if not media_grouped.empty:
-        # Sort by Transaction Amount (결제거래액)
-        media_grouped = media_grouped.sort_values(by='결제거래액', ascending=False)
-        
-        fig_combo = make_subplots(specs=[[{"secondary_y": True}]])
-        
-        # Bar chart for Revenue
-        fig_combo.add_trace(
-            go.Bar(
-                x=media_grouped['매체'],
-                y=media_grouped['결제거래액'],
-                name="결제거래액 (Revenue)",
-                marker_color="#FF4B4B",
-                hovertemplate="매체: %{x}<br>거래액: ₩%{y:,.0f}"
-            ),
-            secondary_y=False
-        )
-        
-        # Line chart for ROAS
-        fig_combo.add_trace(
-            go.Scatter(
-                x=media_grouped['매체'],
-                y=media_grouped['ROAS'],
-                name="ROAS (%)",
-                mode="lines+markers",
-                line=dict(color="#FF8F00", width=3),
-                marker=dict(size=8),
-                hovertemplate="매체: %{x}<br>ROAS: %{y:.1f}%"
-            ),
-            secondary_y=True
-        )
-        
-        fig_combo.update_layout(
-            template="plotly_white",
-            margin=dict(l=40, r=40, t=20, b=40),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            xaxis=dict(showgrid=False),
-            yaxis=dict(title="결제거래액 (원)", showgrid=True, gridcolor="#F1F3F5"),
-            yaxis2=dict(title="ROAS (%)", showgrid=False, overlaying="y", side="right")
-        )
-        st.plotly_chart(fig_combo, use_container_width=True)
-    else:
-        st.info("데이터가 없습니다.")
+# ----------------------------------------------------
+# Section 5: 효율 매트릭스 산점도 (Scatter Plot)
+# ----------------------------------------------------
+st.markdown("### 🎯 **제휴사별 효율 매트릭스 (광고비 vs ROAS)**")
 
-    # ----------------------------------------------------
-    # Section 5: 효율 매트릭스 산점도 (Scatter Plot)
-    # ----------------------------------------------------
-    st.markdown("### 🎯 **제휴사별 효율 매트릭스 (광고비 vs ROAS)**")
+# We group by '제휴사명' (Campaign level details)
+campaign_grouped = filtered_df.groupby(['제휴사명', '매체']).agg({
+    '집행 광고비': 'sum',
+    '결제거래액': 'sum',
+    '클릭': 'sum'
+}).reset_index()
+campaign_grouped['ROAS'] = np.where(campaign_grouped['집행 광고비'] > 0, (campaign_grouped['결제거래액'] / campaign_grouped['집행 광고비']) * 100, 0.0)
+campaign_grouped = campaign_grouped[campaign_grouped['집행 광고비'] > 0] # Filter out zero spends for visual clarity
+
+if not campaign_grouped.empty:
+    fig_scatter = px.scatter(
+        campaign_grouped,
+        x="집행 광고비",
+        y="ROAS",
+        size="결제거래액",
+        color="매체",
+        hover_name="제휴사명",
+        log_x=True, # Log scale on X as spend ranges can vary significantly
+        title="제휴사별 광고비 대비 ROAS 산점도 (원 크기: 결제거래액)",
+        labels={"집행 광고비": "집행 광고비 (원, 로그스케일)", "ROAS": "ROAS (%)"},
+        color_discrete_sequence=px.colors.qualitative.Bold
+    )
     
-    # We group by '제휴사명' (Campaign level details)
-    campaign_grouped = filtered_df.groupby(['제휴사명', '매체']).agg({
-        '집행 광고비': 'sum',
-        '결제거래액': 'sum',
-        '클릭': 'sum'
-    }).reset_index()
-    campaign_grouped['ROAS'] = np.where(campaign_grouped['집행 광고비'] > 0, (campaign_grouped['결제거래액'] / campaign_grouped['집행 광고비']) * 100, 0.0)
-    campaign_grouped = campaign_grouped[campaign_grouped['집행 광고비'] > 0] # Filter out zero spends for visual clarity
+    # Add target horizontal reference line for target ROAS (e.g. 300% or average)
+    fig_scatter.add_hline(y=curr_roas, line_dash="dash", line_color="gray", annotation_text=f"전체 평균 ROAS ({curr_roas:.1f}%)")
     
-    if not campaign_grouped.empty:
-        fig_scatter = px.scatter(
-            campaign_grouped,
-            x="집행 광고비",
-            y="ROAS",
-            size="결제거래액",
-            color="매체",
-            hover_name="제휴사명",
-            log_x=True, # Log scale on X as spend ranges can vary significantly
-            title="제휴사별 광고비 대비 ROAS 산점도 (원 크기: 결제거래액)",
-            labels={"집행 광고비": "집행 광고비 (원, 로그스케일)", "ROAS": "ROAS (%)"},
-            color_discrete_sequence=px.colors.qualitative.Bold
-        )
-        
-        # Add target horizontal reference line for target ROAS (e.g. 300% or average)
-        fig_scatter.add_hline(y=curr_roas, line_dash="dash", line_color="gray", annotation_text=f"전체 평균 ROAS ({curr_roas:.1f}%)")
-        
-        fig_scatter.update_layout(
-            template="plotly_white",
-            margin=dict(l=40, r=40, t=40, b=40)
-        )
-        st.plotly_chart(fig_scatter, use_container_width=True)
-    else:
-        st.info("산점도를 구성할 집행 데이터가 충분하지 않습니다.")
+    fig_scatter.update_layout(
+        template="plotly_white",
+        margin=dict(l=40, r=40, t=40, b=40)
+    )
+    st.plotly_chart(fig_scatter, use_container_width=True)
+else:
+    st.info("산점도를 구성할 집행 데이터가 충분하지 않습니다.")
 
 
 

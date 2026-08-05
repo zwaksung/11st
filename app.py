@@ -210,15 +210,17 @@ def get_delta_str(curr, prev, is_percentage=False, is_cpc=False):
         return f"{change:+.1f}% {'(개선)' if change < 0 else '(상승)'}"
     return f"{change:+.1f}%"
 
-# 6. Main UI Layout (Option B: Tab-based 2-Column Structure)
-tab_dashboard, tab_chatbot = st.tabs(["📊 성과 대시보드 Hub", "🤖 AI Performance Analyst"])
+# 6. Main UI Layout (Full Width Dashboard + Floating AI Chatbot Widget)
+title_col, chatbot_widget_col = st.columns([3, 1])
 
-# ==========================================
-# TAB 1: PERFORMANCE DASHBOARD VISUALS
-# ==========================================
-with tab_dashboard:
+with title_col:
     st.markdown('<div class="main-title">AI 결합형 공동 퍼포먼스 대시보드</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">실시간 성과 모니터링 & AI 기여도 분석 허브</div>', unsafe_allow_html=True)
+
+with chatbot_widget_col:
+    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+    with st.popover("🤖 **AI Analyst 챗봇 열기**", use_container_width=True):
+        draw_chatbot()
     
     # ----------------------------------------------------
     # Section 1: Executive Summary Comment
@@ -634,8 +636,4 @@ def draw_chatbot():
         st.session_state.messages = []
         st.rerun()
 
-# ==========================================
-# TAB 2: AI PERFORMANCE ANALYST CHATBOT
-# ==========================================
-with tab_chatbot:
-    draw_chatbot()
+

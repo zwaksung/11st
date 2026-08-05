@@ -210,6 +210,137 @@ def get_delta_str(curr, prev, is_percentage=False, is_cpc=False):
         return f"{change:+.1f}% {'(개선)' if change < 0 else '(상승)'}"
     return f"{change:+.1f}%"
 
+# ==========================================
+# AI CHATBOT AGENT DEFINITION
+# ==========================================
+def draw_chatbot():
+    st.markdown('<div class="sidebar-anchor"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title" style="font-size:1.8rem; background: linear-gradient(135deg, #FF8F00 0%, #FFD600 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">AI Performance Analyst</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title" style="margin-bottom:1rem;">데이터 기반 퍼포먼스 마케팅 어시스턴트</div>', unsafe_allow_html=True)
+    
+    # 1. Structured Data Context preparation for Gemini
+    # Media Summary (Markdown)
+    llm_media_df = filtered_df.groupby('매체').agg({
+        '집행 광고비': 'sum',
+        '결제거래액': 'sum',
+        '노출': 'sum',
+        '클릭': 'sum',
+        '결제건수': 'sum'
+    }).reset_index()
+    
+    llm_media_df['ROAS(%)'] = np.where(llm_media_df['집행 광고비'] > 0, (llm_media_df['결제거래액'] / llm_media_df['집행 광고비'] * 100).round(1), 0.0)
+    llm_media_df['CTR(%)'] = np.where(llm_media_df['노출'] > 0, (llm_media_df['클릭'] / llm_media_df['노출'] * 100).round(2), 0.0)
+    llm_media_df['CPC(원)'] = np.where(llm_media_df['클릭'] > 0, (llm_media_df['집행 광고비'] / llm_media_df['클릭']).round(0), 0.0)
+    llm_media_df['CVR(%)'] = np.where(llm_media_df['클릭'] > 0, (llm_media_df['결제건수'] / llm_media_df['클릭'] * 100).round(2), 0.0)
+    
+    # Drop raw values for compact tokens, keeping the KPIs and totals
+    media_context_table = llm_media_df[['매체', '집행 광고비', '결제거래액', 'ROAS(%)', 'CTR(%)', 'CPC(원)', 'CVR(%)']].to_markdown(index=False)
+    
+    # Campaign Summary (Top 8 campaigns by spend)
+    llm_camp_df = filtered_df.groupby(['제휴사명', '매체']).agg({
+        '집행 광고비': 'sum',
+        '결제거래액': 'sum',
+        '클릭': 'sum',
+        '결제건수': 'sum'
+    }).reset_index()
+    
+    llm_camp_df['ROAS(%)'] = np.where(llm_camp_df['집행 광고비'] > 0, (llm_camp_df['결제거래액'] / llm_camp_df['집행 광고비'] * 100).round(1), 0.0)
+    llm_camp_df['CVR(%)'] = np.where(llm_camp_df['클릭'] > 0, (llm_camp_df['결제건수'] / llm_camp_df['클릭'] * 100).round(2), 0.0)
+    llm_camp_top = llm_camp_df.sort_values(by='집행 광고비', ascending=False).head(8)
+    
+    campaign_context_table = llm_camp_top[['제휴사명', '매체', '집행 광고비', '결제거래액', 'ROAS(%)', 'CVR(%)']].to_markdown(index=False)
+    
+    # System Instruction Definition (AE personality & context)
+    system_instruction = f"""
+    당신은 10년 차 이상의 최상급 디지털 광고 AE이자 퍼포먼스 마케팅 전문가입니다. 
+    사용자가 질문하면 제공된 대시보드의 데이터 컨텍스트에 전적으로 근거하여 정확하고 분석적인 마케팅 피드백을 제공하세요.
+    수치를 가공하거나 거짓 정보를 주지 마세요. 부족한 경우 컨텍스트에 주어진 데이터만 활용 가능하다고 명시하세요.
+    마케팅 용어(ROAS, CPC, CTR, CVR 등)를 적재적소에 사용하고 예산 배분 제안이나 성과 개선 원인 분석 등의 AE적 인사이트를 추가해 주면 매우 좋습니다.
+    친절하고 전문적인 비즈니스 톤앤매너(한국어)로 답변해 주세요.
+    
+    [실시간 대시보드 데이터 컨텍스트]
+    - 조회 범위: {start_date} ~ {end_date} (총 {days_diff}일)
+    - 매체 필터 상태: {", ".join(selected_media)}
+    
+    [종합 요약 KPI]
+    - 총 광고비: {curr_spend:,.0f}원 (이전 기간 대비 {get_delta_str(curr_spend, prev_spend)})
+    - 총 결제거래액: {curr_rev:,.0f}원 (이전 기간 대비 {get_delta_str(curr_rev, prev_rev)})
+    - 평균 ROAS: {curr_roas:.1f}% (이전 기간 대비 {curr_roas - prev_roas:+.1f}%p)
+    - 총 클릭수: {curr_clicks:,.0f}회
+    - 평균 CTR: {curr_ctr:.2f}%
+    - 평균 CPC: {curr_cpc:,.0f}원 (이전 기간 대비 {get_delta_str(curr_cpc, prev_cpc, is_cpc=True)})
+    - 평균 CVR: {curr_cvr:.2f}%
+    
+    [매체별 KPI 집계 요약]
+    {media_context_table}
+    
+    [상위 집행 제휴사(캠페인) 상세 요약 - Top 8]
+    {campaign_context_table}
+    """
+
+    # Chat Container
+    chat_container = st.container(height=500)
+    
+    # Render Chat History
+    with chat_container:
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+                
+    # Chat Input Process
+    if user_query := st.chat_input("광고 성과에 대해 무엇이든 물어보세요 (예: 'ROAS 효율이 가장 높은 매체는?')"):
+        # Display user message
+        with chat_container:
+            with st.chat_message("user"):
+                st.markdown(user_query)
+        st.session_state.messages.append({"role": "user", "content": user_query})
+        
+        # Exception check: API Key
+        if not gemini_key:
+            with chat_container:
+                with st.chat_message("assistant"):
+                    st.warning("⚠️ 좌측 사이드바에 Gemini API Key를 입력해주세요.")
+            st.session_state.messages.append({"role": "assistant", "content": "⚠️ 좌측 사이드바에 Gemini API Key를 입력해주세요."})
+        else:
+            with chat_container:
+                with st.chat_message("assistant"):
+                    message_placeholder = st.empty()
+                    full_response = ""
+                    
+                    try:
+                        # Call Google Gemini API (streaming format)
+                        genai.configure(api_key=gemini_key)
+                        model = genai.GenerativeModel(
+                            model_name="gemini-3.5-flash",
+                            system_instruction=system_instruction
+                        )
+                        
+                        # Prepare the dialog structure for model request
+                        contents = []
+                        for msg in st.session_state.messages:
+                            role = "user" if msg["role"] == "user" else "model"
+                            contents.append({
+                                "role": role,
+                                "parts": [msg["content"]]
+                            })
+                            
+                        response_stream = model.generate_content(contents, stream=True)
+                        for chunk in response_stream:
+                            full_response += chunk.text
+                            message_placeholder.markdown(full_response + "▌")
+                        message_placeholder.markdown(full_response)
+                        
+                    except Exception as e:
+                        full_response = f"죄송합니다. Gemini API 요청 중 오류가 발생했습니다: {str(e)}"
+                        message_placeholder.error(full_response)
+                        
+            st.session_state.messages.append({"role": "assistant", "content": full_response})
+            
+    # Reset Chat button
+    if st.button("🔄 대화 기록 초기화"):
+        st.session_state.messages = []
+        st.rerun()
+
 # 6. Main UI Layout (Full Width Dashboard + Floating AI Chatbot Widget)
 title_col, chatbot_widget_col = st.columns([3, 1])
 
@@ -505,135 +636,6 @@ with chatbot_widget_col:
     else:
         st.info("산점도를 구성할 집행 데이터가 충분하지 않습니다.")
 
-# ==========================================
-# RIGHT COLUMN: AI CHATBOT AGENT
-# ==========================================
-def draw_chatbot():
-    st.markdown('<div class="sidebar-anchor"></div>', unsafe_allow_html=True)
-    st.markdown('<div class="main-title" style="font-size:1.8rem; background: linear-gradient(135deg, #FF8F00 0%, #FFD600 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">AI Performance Analyst</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-title" style="margin-bottom:1rem;">데이터 기반 퍼포먼스 마케팅 어시스턴트</div>', unsafe_allow_html=True)
-    
-    # 1. Structured Data Context preparation for Gemini
-    # Media Summary (Markdown)
-    llm_media_df = filtered_df.groupby('매체').agg({
-        '집행 광고비': 'sum',
-        '결제거래액': 'sum',
-        '노출': 'sum',
-        '클릭': 'sum',
-        '결제건수': 'sum'
-    }).reset_index()
-    
-    llm_media_df['ROAS(%)'] = np.where(llm_media_df['집행 광고비'] > 0, (llm_media_df['결제거래액'] / llm_media_df['집행 광고비'] * 100).round(1), 0.0)
-    llm_media_df['CTR(%)'] = np.where(llm_media_df['노출'] > 0, (llm_media_df['클릭'] / llm_media_df['노출'] * 100).round(2), 0.0)
-    llm_media_df['CPC(원)'] = np.where(llm_media_df['클릭'] > 0, (llm_media_df['집행 광고비'] / llm_media_df['클릭']).round(0), 0.0)
-    llm_media_df['CVR(%)'] = np.where(llm_media_df['클릭'] > 0, (llm_media_df['결제건수'] / llm_media_df['클릭'] * 100).round(2), 0.0)
-    
-    # Drop raw values for compact tokens, keeping the KPIs and totals
-    media_context_table = llm_media_df[['매체', '집행 광고비', '결제거래액', 'ROAS(%)', 'CTR(%)', 'CPC(원)', 'CVR(%)']].to_markdown(index=False)
-    
-    # Campaign Summary (Top 8 campaigns by spend)
-    llm_camp_df = filtered_df.groupby(['제휴사명', '매체']).agg({
-        '집행 광고비': 'sum',
-        '결제거래액': 'sum',
-        '클릭': 'sum',
-        '결제건수': 'sum'
-    }).reset_index()
-    
-    llm_camp_df['ROAS(%)'] = np.where(llm_camp_df['집행 광고비'] > 0, (llm_camp_df['결제거래액'] / llm_camp_df['집행 광고비'] * 100).round(1), 0.0)
-    llm_camp_df['CVR(%)'] = np.where(llm_camp_df['클릭'] > 0, (llm_camp_df['결제건수'] / llm_camp_df['클릭'] * 100).round(2), 0.0)
-    llm_camp_top = llm_camp_df.sort_values(by='집행 광고비', ascending=False).head(8)
-    
-    campaign_context_table = llm_camp_top[['제휴사명', '매체', '집행 광고비', '결제거래액', 'ROAS(%)', 'CVR(%)']].to_markdown(index=False)
-    
-    # System Instruction Definition (AE personality & context)
-    system_instruction = f"""
-    당신은 10년 차 이상의 최상급 디지털 광고 AE이자 퍼포먼스 마케팅 전문가입니다. 
-    사용자가 질문하면 제공된 대시보드의 데이터 컨텍스트에 전적으로 근거하여 정확하고 분석적인 마케팅 피드백을 제공하세요.
-    수치를 가공하거나 거짓 정보를 주지 마세요. 부족한 경우 컨텍스트에 주어진 데이터만 활용 가능하다고 명시하세요.
-    마케팅 용어(ROAS, CPC, CTR, CVR 등)를 적재적소에 사용하고 예산 배분 제안이나 성과 개선 원인 분석 등의 AE적 인사이트를 추가해 주면 매우 좋습니다.
-    친절하고 전문적인 비즈니스 톤앤매너(한국어)로 답변해 주세요.
-    
-    [실시간 대시보드 데이터 컨텍스트]
-    - 조회 범위: {start_date} ~ {end_date} (총 {days_diff}일)
-    - 매체 필터 상태: {", ".join(selected_media)}
-    
-    [종합 요약 KPI]
-    - 총 광고비: {curr_spend:,.0f}원 (이전 기간 대비 {get_delta_str(curr_spend, prev_spend)})
-    - 총 결제거래액: {curr_rev:,.0f}원 (이전 기간 대비 {get_delta_str(curr_rev, prev_rev)})
-    - 평균 ROAS: {curr_roas:.1f}% (이전 기간 대비 {curr_roas - prev_roas:+.1f}%p)
-    - 총 클릭수: {curr_clicks:,.0f}회
-    - 평균 CTR: {curr_ctr:.2f}%
-    - 평균 CPC: {curr_cpc:,.0f}원 (이전 기간 대비 {get_delta_str(curr_cpc, prev_cpc, is_cpc=True)})
-    - 평균 CVR: {curr_cvr:.2f}%
-    
-    [매체별 KPI 집계 요약]
-    {media_context_table}
-    
-    [상위 집행 제휴사(캠페인) 상세 요약 - Top 8]
-    {campaign_context_table}
-    """
 
-    # Chat Container
-    chat_container = st.container(height=500)
-    
-    # Render Chat History
-    with chat_container:
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
-                
-    # Chat Input Process
-    if user_query := st.chat_input("광고 성과에 대해 무엇이든 물어보세요 (예: 'ROAS 효율이 가장 높은 매체는?')"):
-        # Display user message
-        with chat_container:
-            with st.chat_message("user"):
-                st.markdown(user_query)
-        st.session_state.messages.append({"role": "user", "content": user_query})
-        
-        # Exception check: API Key
-        if not gemini_key:
-            with chat_container:
-                with st.chat_message("assistant"):
-                    st.warning("⚠️ 좌측 사이드바에 Gemini API Key를 입력해주세요.")
-            st.session_state.messages.append({"role": "assistant", "content": "⚠️ 좌측 사이드바에 Gemini API Key를 입력해주세요."})
-        else:
-            with chat_container:
-                with st.chat_message("assistant"):
-                    message_placeholder = st.empty()
-                    full_response = ""
-                    
-                    try:
-                        # Call Google Gemini API (streaming format)
-                        genai.configure(api_key=gemini_key)
-                        model = genai.GenerativeModel(
-                            model_name="gemini-3.5-flash",
-                            system_instruction=system_instruction
-                        )
-                        
-                        # Prepare the dialog structure for model request
-                        contents = []
-                        for msg in st.session_state.messages:
-                            role = "user" if msg["role"] == "user" else "model"
-                            contents.append({
-                                "role": role,
-                                "parts": [msg["content"]]
-                            })
-                            
-                        response_stream = model.generate_content(contents, stream=True)
-                        for chunk in response_stream:
-                            full_response += chunk.text
-                            message_placeholder.markdown(full_response + "▌")
-                        message_placeholder.markdown(full_response)
-                        
-                    except Exception as e:
-                        full_response = f"죄송합니다. Gemini API 요청 중 오류가 발생했습니다: {str(e)}"
-                        message_placeholder.error(full_response)
-                        
-            st.session_state.messages.append({"role": "assistant", "content": full_response})
-            
-    # Reset Chat button
-    if st.button("🔄 대화 기록 초기화"):
-        st.session_state.messages = []
-        st.rerun()
 
 

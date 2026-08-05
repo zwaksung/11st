@@ -132,11 +132,6 @@ gemini_key = st.sidebar.text_input(
     help="Google AI Studio에서 발급받은 API 키를 입력하면 실시간 성과 브리핑 및 맞춤형 분석이 가능합니다."
 )
 
-# Collapsible Right Sidebar Toggle
-st.sidebar.markdown("---")
-st.sidebar.markdown("### **AI Analyst 제어**")
-show_chatbot = st.sidebar.toggle("💬 AI Analyst 활성화", value=True)
-
 st.sidebar.markdown("---")
 st.sidebar.markdown("### **대시보드 필터**")
 
@@ -215,16 +210,13 @@ def get_delta_str(curr, prev, is_percentage=False, is_cpc=False):
         return f"{change:+.1f}% {'(개선)' if change < 0 else '(상승)'}"
     return f"{change:+.1f}%"
 
-# 6. Main UI Layout (Dynamic Columns based on chatbot toggle)
-if show_chatbot:
-    col_dashboard, col_chatbot = st.columns([3, 2])
-else:
-    col_dashboard, col_chatbot = st.columns([999, 1])
+# 6. Main UI Layout (Option B: Tab-based 2-Column Structure)
+tab_dashboard, tab_chatbot = st.tabs(["📊 성과 대시보드 Hub", "🤖 AI Performance Analyst"])
 
 # ==========================================
-# LEFT COLUMN: PERFORMANCE DASHBOARD VISUALS
+# TAB 1: PERFORMANCE DASHBOARD VISUALS
 # ==========================================
-with col_dashboard:
+with tab_dashboard:
     st.markdown('<div class="main-title">AI 결합형 공동 퍼포먼스 대시보드</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">실시간 성과 모니터링 & AI 기여도 분석 허브</div>', unsafe_allow_html=True)
     
@@ -296,46 +288,54 @@ with col_dashboard:
             pass
 
     # ----------------------------------------------------
-    # Section 2: [전문가 추천] KPI 스코어카드
+    # Section 2: [전문가 추천] KPI 스코어카드 (3열 2줄)
     # ----------------------------------------------------
     st.markdown("### 📊 **핵심 성과 지표 (KPI Scorecard)**")
+    kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
+    kpi_col4, kpi_col5, kpi_col6 = st.columns(3)
     
-    st.metric(
-        label="집행 광고비 (Cost)",
-        value=f"₩ {curr_spend:,.0f}",
-        delta=get_delta_str(curr_spend, prev_spend),
-        delta_color="normal"
-    )
-    st.metric(
-        label="결제거래액 (Revenue)",
-        value=f"₩ {curr_rev:,.0f}",
-        delta=get_delta_str(curr_rev, prev_rev),
-        delta_color="normal"
-    )
-    st.metric(
-        label="평균 ROAS",
-        value=f"{curr_roas:.1f} %",
-        delta=f"{curr_roas - prev_roas:+.1f}%p",
-        delta_color="normal"
-    )
-    st.metric(
-        label="클릭수 (Clicks)",
-        value=f"{curr_clicks:,.0f} 회",
-        delta=get_delta_str(curr_clicks, prev_clicks),
-        delta_color="normal"
-    )
-    st.metric(
-        label="클릭율 (CTR)",
-        value=f"{curr_ctr:.2f} %",
-        delta=f"{curr_ctr - prev_ctr:+.2f}%p",
-        delta_color="normal"
-    )
-    st.metric(
-        label="평균 클릭단가 (CPC)",
-        value=f"₩ {curr_cpc:,.0f}",
-        delta=get_delta_str(curr_cpc, prev_cpc, is_cpc=True),
-        delta_color="inverse"
-    )
+    with kpi_col1:
+        st.metric(
+            label="집행 광고비 (Cost)",
+            value=f"₩ {curr_spend:,.0f}",
+            delta=get_delta_str(curr_spend, prev_spend),
+            delta_color="normal"
+        )
+    with kpi_col2:
+        st.metric(
+            label="결제거래액 (Revenue)",
+            value=f"₩ {curr_rev:,.0f}",
+            delta=get_delta_str(curr_rev, prev_rev),
+            delta_color="normal"
+        )
+    with kpi_col3:
+        st.metric(
+            label="평균 ROAS",
+            value=f"{curr_roas:.1f} %",
+            delta=f"{curr_roas - prev_roas:+.1f}%p",
+            delta_color="normal"
+        )
+    with kpi_col4:
+        st.metric(
+            label="클릭수 (Clicks)",
+            value=f"{curr_clicks:,.0f} 회",
+            delta=get_delta_str(curr_clicks, prev_clicks),
+            delta_color="normal"
+        )
+    with kpi_col5:
+        st.metric(
+            label="클릭율 (CTR)",
+            value=f"{curr_ctr:.2f} %",
+            delta=f"{curr_ctr - prev_ctr:+.2f}%p",
+            delta_color="normal"
+        )
+    with kpi_col6:
+        st.metric(
+            label="평균 클릭단가 (CPC)",
+            value=f"₩ {curr_cpc:,.0f}",
+            delta=get_delta_str(curr_cpc, prev_cpc, is_cpc=True),
+            delta_color="inverse"
+        )
 
     st.markdown("---")
 
@@ -634,7 +634,8 @@ def draw_chatbot():
         st.session_state.messages = []
         st.rerun()
 
-if show_chatbot and col_chatbot is not None:
-    with col_chatbot:
-        with st.container():
-            draw_chatbot()
+# ==========================================
+# TAB 2: AI PERFORMANCE ANALYST CHATBOT
+# ==========================================
+with tab_chatbot:
+    draw_chatbot()

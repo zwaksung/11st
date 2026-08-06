@@ -135,17 +135,30 @@ gemini_key = st.sidebar.text_input(
 st.sidebar.markdown("---")
 st.sidebar.markdown("### **대시보드 필터**")
 
-# Media Filter Selection
-available_media = sorted(df_raw['매체'].dropna().unique().tolist())
-select_all_media = st.sidebar.checkbox("🌐 모든 매체 선택", value=True)
+# Media Filter Selection (제휴사명2 -> 매체)
+available_media2 = sorted(df_raw['제휴사명2'].dropna().unique().tolist())
+select_all_media2 = st.sidebar.checkbox("🌐 모든 매체 선택", value=True)
 
-if select_all_media:
-    selected_media = available_media
+if select_all_media2:
+    selected_media2 = available_media2
 else:
-    selected_media = st.sidebar.multiselect(
-        "매체 필터",
-        options=available_media,
-        default=available_media[:3] if len(available_media) >= 3 else available_media
+    selected_media2 = st.sidebar.multiselect(
+        "매체 필터 (제휴사명2)",
+        options=available_media2,
+        default=available_media2[:3] if len(available_media2) >= 3 else available_media2
+    )
+
+# Media Device Filter Selection (제휴사명3 -> 매체 디바이스)
+available_media3 = sorted(df_raw['제휴사명3'].dropna().unique().tolist())
+select_all_media3 = st.sidebar.checkbox("📱 모든 매체 디바이스 선택", value=True)
+
+if select_all_media3:
+    selected_media3 = available_media3
+else:
+    selected_media3 = st.sidebar.multiselect(
+        "매체 디바이스 필터 (제휴사명3)",
+        options=available_media3,
+        default=available_media3[:3] if len(available_media3) >= 3 else available_media3
     )
 
 # Date Filter Selection
@@ -168,7 +181,8 @@ else:
 
 # 4. Filter Data Based on User Input
 filtered_df = df_raw[
-    (df_raw['매체'].isin(selected_media)) &
+    (df_raw['제휴사명2'].isin(selected_media2)) &
+    (df_raw['제휴사명3'].isin(selected_media3)) &
     (df_raw['일자'].dt.date >= start_date) &
     (df_raw['일자'].dt.date <= end_date)
 ]
@@ -179,7 +193,8 @@ prev_start_date = start_date - datetime.timedelta(days=days_diff)
 prev_end_date = start_date - datetime.timedelta(days=1)
 
 prev_df = df_raw[
-    (df_raw['매체'].isin(selected_media)) &
+    (df_raw['제휴사명2'].isin(selected_media2)) &
+    (df_raw['제휴사명3'].isin(selected_media3)) &
     (df_raw['일자'].dt.date >= prev_start_date) &
     (df_raw['일자'].dt.date <= prev_end_date)
 ]
@@ -219,14 +234,14 @@ def draw_chatbot():
     st.markdown('<div class="sub-title" style="margin-bottom:1rem;">데이터 기반 퍼포먼스 마케팅 어시스턴트</div>', unsafe_allow_html=True)
     
     # 1. Structured Data Context preparation for Gemini
-    # Media Summary (Markdown)
-    llm_media_df = filtered_df.groupby('매체').agg({
+    # Media Summary (Markdown for 제휴사명2)
+    llm_media_df = filtered_df.groupby('제휴사명2').agg({
         '집행 광고비': 'sum',
         '결제거래액': 'sum',
         '노출': 'sum',
         '클릭': 'sum',
         '결제건수': 'sum'
-    }).reset_index()
+    }).reset_index().rename(columns={'제휴사명2': '매체'})
     
     llm_media_df['ROAS(%)'] = np.where(llm_media_df['집행 광고비'] > 0, (llm_media_df['결제거래액'] / llm_media_df['집행 광고비'] * 100).round(1), 0.0)
     llm_media_df['CTR(%)'] = np.where(llm_media_df['노출'] > 0, (llm_media_df['클릭'] / llm_media_df['노출'] * 100).round(2), 0.0)
@@ -239,22 +254,22 @@ def draw_chatbot():
     except Exception:
         media_context_table = llm_media_df[['매체', '집행 광고비', '결제거래액', 'ROAS(%)', 'CTR(%)', 'CPC(원)', 'CVR(%)']].to_string(index=False)
     
-    # Campaign Summary (Top 8 campaigns by spend)
-    llm_camp_df = filtered_df.groupby(['제휴사명', '매체']).agg({
+    # Campaign Summary (Top 8 campaigns by spend for 제휴사명3)
+    llm_camp_df = filtered_df.groupby(['제휴사명3', '제휴사명2']).agg({
         '집행 광고비': 'sum',
         '결제거래액': 'sum',
         '클릭': 'sum',
         '결제건수': 'sum'
-    }).reset_index()
+    }).reset_index().rename(columns={'제휴사명2': '매체', '제휴사명3': '매체 디바이스'})
     
     llm_camp_df['ROAS(%)'] = np.where(llm_camp_df['집행 광고비'] > 0, (llm_camp_df['결제거래액'] / llm_camp_df['집행 광고비'] * 100).round(1), 0.0)
     llm_camp_df['CVR(%)'] = np.where(llm_camp_df['클릭'] > 0, (llm_camp_df['결제건수'] / llm_camp_df['클릭'] * 100).round(2), 0.0)
     llm_camp_top = llm_camp_df.sort_values(by='집행 광고비', ascending=False).head(8)
     
     try:
-        campaign_context_table = llm_camp_top[['제휴사명', '매체', '집행 광고비', '결제거래액', 'ROAS(%)', 'CVR(%)']].to_markdown(index=False)
+        campaign_context_table = llm_camp_top[['매체 디바이스', '매체', '집행 광고비', '결제거래액', 'ROAS(%)', 'CVR(%)']].to_markdown(index=False)
     except Exception:
-        campaign_context_table = llm_camp_top[['제휴사명', '매체', '집행 광고비', '결제거래액', 'ROAS(%)', 'CVR(%)']].to_string(index=False)
+        campaign_context_table = llm_camp_top[['매체 디바이스', '매체', '집행 광고비', '결제거래액', 'ROAS(%)', 'CVR(%)']].to_string(index=False)
     
     # System Instruction Definition (AE personality & context)
     system_instruction = f"""
@@ -266,7 +281,8 @@ def draw_chatbot():
     
     [실시간 대시보드 데이터 컨텍스트]
     - 조회 범위: {start_date} ~ {end_date} (총 {days_diff}일)
-    - 매체 필터 상태: {", ".join(selected_media)}
+    - 매체(제휴사명2) 필터 상태: {", ".join(selected_media2)}
+    - 매체 디바이스(제휴사명3) 필터 상태: {", ".join(selected_media3)}
     
     [종합 요약 KPI]
     - 총 광고비: {curr_spend:,.0f}원 (이전 기간 대비 {get_delta_str(curr_spend, prev_spend)})
@@ -368,7 +384,7 @@ st.markdown("### 💡 **전일자 및 기간 핵심 성과 요약**")
 top_media = "N/A"
 best_roas_media = "N/A"
 if not filtered_df.empty:
-    media_agg = filtered_df.groupby('매체').agg({'집행 광고비': 'sum', '결제거래액': 'sum'}).reset_index()
+    media_agg = filtered_df.groupby('제휴사명2').agg({'집행 광고비': 'sum', '결제거래액': 'sum'}).reset_index().rename(columns={'제휴사명2': '매체'})
     media_agg['ROAS'] = (media_agg['결제거래액'] / media_agg['집행 광고비'] * 100).fillna(0)
     
     top_media_row = media_agg.sort_values(by='결제거래액', ascending=False).iloc[0] if not media_agg.empty else None
@@ -553,10 +569,10 @@ else:
 # ----------------------------------------------------
 st.markdown("### 📊 **매체별 결제거래액 & ROAS 비교**")
 
-media_grouped = filtered_df.groupby('매체').agg({
+media_grouped = filtered_df.groupby('제휴사명2').agg({
     '집행 광고비': 'sum',
     '결제거래액': 'sum'
-}).reset_index()
+}).reset_index().rename(columns={'제휴사명2': '매체'})
 media_grouped['ROAS'] = np.where(media_grouped['집행 광고비'] > 0, (media_grouped['결제거래액'] / media_grouped['집행 광고비']) * 100, 0.0)
 
 if not media_grouped.empty:
@@ -608,12 +624,12 @@ else:
 # ----------------------------------------------------
 st.markdown("### 🎯 **제휴사별 효율 매트릭스 (광고비 vs ROAS)**")
 
-# We group by '제휴사명' (Campaign level details)
-campaign_grouped = filtered_df.groupby(['제휴사명', '매체']).agg({
+# We group by '제휴사명3' (매체 디바이스) & '제휴사명2' (매체)
+campaign_grouped = filtered_df.groupby(['제휴사명3', '제휴사명2']).agg({
     '집행 광고비': 'sum',
     '결제거래액': 'sum',
     '클릭': 'sum'
-}).reset_index()
+}).reset_index().rename(columns={'제휴사명2': '매체', '제휴사명3': '제휴사명'})
 campaign_grouped['ROAS'] = np.where(campaign_grouped['집행 광고비'] > 0, (campaign_grouped['결제거래액'] / campaign_grouped['집행 광고비']) * 100, 0.0)
 campaign_grouped = campaign_grouped[campaign_grouped['집행 광고비'] > 0] # Filter out zero spends for visual clarity
 

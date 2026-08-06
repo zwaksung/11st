@@ -129,9 +129,6 @@ st.sidebar.markdown("""
     <div style="color: #FFFFFF; font-weight: 800; font-size: 1.15rem; letter-spacing: -0.5px; line-height: 1.3;">
         eMnetX11번가 SA 대시보드
     </div>
-    <div style="color: rgba(255, 255, 255, 0.85); font-size: 0.78rem; margin-top: 4px; font-weight: 500;">
-        Performance Marketing Analytics
-    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -394,7 +391,7 @@ def draw_chatbot():
 title_col, chatbot_widget_col = st.columns([3, 1])
 
 with title_col:
-    st.markdown('<div class="main-title">AI 결합형 공동 퍼포먼스 대시보드</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">11st AI Performance Marketing Analytics</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">실시간 성과 모니터링 & AI 기여도 분석 허브</div>', unsafe_allow_html=True)
 
 with chatbot_widget_col:

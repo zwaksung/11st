@@ -161,6 +161,10 @@ else:
         default=available_media3[:3] if len(available_media3) >= 3 else available_media3
     )
 
+# Date Range Bounds
+min_date = df_raw['일자'].min().date()
+max_date = df_raw['일자'].max().date()
+
 # 1. Current Period Selection
 selected_date_range = st.sidebar.date_input(
     "📅 조회 기간 (현재)",

@@ -161,23 +161,39 @@ else:
         default=available_media3[:3] if len(available_media3) >= 3 else available_media3
     )
 
-# Date Filter Selection
-min_date = df_raw['일자'].min().date()
-max_date = df_raw['일자'].max().date()
-
+# 1. Current Period Selection
 selected_date_range = st.sidebar.date_input(
-    "📅 조회 기간",
+    "📅 조회 기간 (현재)",
     value=(min_date, max_date),
     min_value=min_date,
     max_value=max_date
 )
 
-# Parse Date Range safely (handling partial select when user is interacting)
 if isinstance(selected_date_range, tuple) and len(selected_date_range) == 2:
     start_date, end_date = selected_date_range
 else:
     start_date = selected_date_range[0] if isinstance(selected_date_range, tuple) else selected_date_range
     end_date = max_date
+
+# Calculate default smart previous period for recommendation
+days_diff = (end_date - start_date).days + 1
+default_prev_start = max(min_date, start_date - datetime.timedelta(days=days_diff))
+default_prev_end = max(min_date, start_date - datetime.timedelta(days=1))
+
+# 2. Comparison Period Selection
+selected_prev_date_range = st.sidebar.date_input(
+    "🔄 비교 기간 (대조)",
+    value=(default_prev_start, default_prev_end),
+    min_value=min_date,
+    max_value=max_date,
+    help="성과 비교(Delta)를 위한 대조 기준 기간을 직접 선택하세요."
+)
+
+if isinstance(selected_prev_date_range, tuple) and len(selected_prev_date_range) == 2:
+    prev_start_date, prev_end_date = selected_prev_date_range
+else:
+    prev_start_date = selected_prev_date_range[0] if isinstance(selected_prev_date_range, tuple) else selected_prev_date_range
+    prev_end_date = default_prev_end
 
 # 4. Filter Data Based on User Input
 filtered_df = df_raw[
@@ -186,11 +202,6 @@ filtered_df = df_raw[
     (df_raw['일자'].dt.date >= start_date) &
     (df_raw['일자'].dt.date <= end_date)
 ]
-
-# Calculate previous period data for comparison delta
-days_diff = (end_date - start_date).days + 1
-prev_start_date = start_date - datetime.timedelta(days=days_diff)
-prev_end_date = start_date - datetime.timedelta(days=1)
 
 prev_df = df_raw[
     (df_raw['제휴사명2'].isin(selected_media2)) &
@@ -280,17 +291,18 @@ def draw_chatbot():
     친절하고 전문적인 비즈니스 톤앤매너(한국어)로 답변해 주세요.
     
     [실시간 대시보드 데이터 컨텍스트]
-    - 조회 범위: {start_date} ~ {end_date} (총 {days_diff}일)
+    - 조회 기간(현재): {start_date} ~ {end_date}
+    - 비교 기간(대조): {prev_start_date} ~ {prev_end_date}
     - 매체(제휴사명2) 필터 상태: {", ".join(selected_media2)}
     - 매체 디바이스(제휴사명3) 필터 상태: {", ".join(selected_media3)}
     
     [종합 요약 KPI]
-    - 총 광고비: {curr_spend:,.0f}원 (이전 기간 대비 {get_delta_str(curr_spend, prev_spend)})
-    - 총 결제거래액: {curr_rev:,.0f}원 (이전 기간 대비 {get_delta_str(curr_rev, prev_rev)})
-    - 평균 ROAS: {curr_roas:.1f}% (이전 기간 대비 {curr_roas - prev_roas:+.1f}%p)
+    - 총 광고비: {curr_spend:,.0f}원 (비교 기간 대비 {get_delta_str(curr_spend, prev_spend)})
+    - 총 결제거래액: {curr_rev:,.0f}원 (비교 기간 대비 {get_delta_str(curr_rev, prev_rev)})
+    - 평균 ROAS: {curr_roas:.1f}% (비교 기간 대비 {curr_roas - prev_roas:+.1f}%p)
     - 총 클릭수: {curr_clicks:,.0f}회
     - 평균 CTR: {curr_ctr:.2f}%
-    - 평균 CPC: {curr_cpc:,.0f}원 (이전 기간 대비 {get_delta_str(curr_cpc, prev_cpc, is_cpc=True)})
+    - 평균 CPC: {curr_cpc:,.0f}원 (비교 기간 대비 {get_delta_str(curr_cpc, prev_cpc, is_cpc=True)})
     - 평균 CVR: {curr_cvr:.2f}%
     
     [매체별 KPI 집계 요약]
@@ -395,9 +407,9 @@ if not filtered_df.empty:
     if best_roas_row is not None:
         best_roas_media = f"{best_roas_row['매체']} (ROAS {best_roas_row['ROAS']:.1f}%)"
         
-rule_summary = f"""현재 선택된 기간 동안 집행된 총 광고비는 **{curr_spend:,.0f}원**, 총 결제거래액은 **{curr_rev:,.0f}원**이며 평균 ROAS는 **{curr_roas:.1f}%**를 기록하고 있습니다. 
+rule_summary = f"""현재 선택된 조회 기간({start_date} ~ {end_date}) 동안 집행된 총 광고비는 **{curr_spend:,.0f}원**, 총 결제거래액은 **{curr_rev:,.0f}원**이며 평균 ROAS는 **{curr_roas:.1f}%**를 기록하고 있습니다. 
 가장 높은 매출을 창출한 매체는 **{top_media}**이며, 가장 효율이 우수한 ROAS 매체는 **{best_roas_media}**입니다. 
-이전 동기간 대비 광고비는 **{get_delta_str(curr_spend, prev_spend)}**, 매출액은 **{get_delta_str(curr_rev, prev_rev)}**, ROAS는 **{curr_roas - prev_roas:+.1f}%p** 변동하였습니다."""
+설정한 비교 기간({prev_start_date} ~ {prev_end_date}) 대비 광고비는 **{get_delta_str(curr_spend, prev_spend)}**, 매출액은 **{get_delta_str(curr_rev, prev_rev)}**, ROAS는 **{curr_roas - prev_roas:+.1f}%p** 변동하였습니다."""
 
 summary_placeholder = st.empty()
 summary_placeholder.markdown(f"""
@@ -416,14 +428,15 @@ if gemini_key:
         
         prompt_summary = f"""
         너는 10년 차 광고 대행사 AE이자 퍼포먼스 마케팅 디렉터야. 
-        아래 제공된 데이터를 바탕으로 광고주에게 보낼 '전일자 및 선택 기간 핵심 성과 브리핑 요약'을 작성해 줘.
+        아래 제공된 데이터를 바탕으로 광고주에게 보낼 '선택 기간 성과 및 비교 기간 대비 브리핑 요약'을 작성해 줘.
         데이터 수치에 완전히 근거해야 하며, 전문적인 톤앤매너로 작성하되 3문장 이내로 명확하게 브리핑해 줘.
         
         [조회 데이터 세부 요약]
-        - 조회 기간: {start_date} ~ {end_date}
-        - 집행 광고비: {curr_spend:,.0f}원 (이전 동기 대비 {get_delta_str(curr_spend, prev_spend)})
-        - 결제거래액: {curr_rev:,.0f}원 (이전 동기 대비 {get_delta_str(curr_rev, prev_rev)})
-        - 평균 ROAS: {curr_roas:.1f}% (이전 동기 대비 {curr_roas - prev_roas:+.1f}%p 변동)
+        - 조회 기간(현재): {start_date} ~ {end_date}
+        - 비교 기간(대조): {prev_start_date} ~ {prev_end_date}
+        - 집행 광고비: {curr_spend:,.0f}원 (비교 기간 대비 {get_delta_str(curr_spend, prev_spend)})
+        - 결제거래액: {curr_rev:,.0f}원 (비교 기간 대비 {get_delta_str(curr_rev, prev_rev)})
+        - 평균 ROAS: {curr_roas:.1f}% (비교 기간 대비 {curr_roas - prev_roas:+.1f}%p 변동)
         - 탑 매출 매체: {top_media}
         - 최고 효율 매체: {best_roas_media}
         """

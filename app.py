@@ -520,6 +520,93 @@ with kpi_col6:
 st.markdown("---")
 
 # ----------------------------------------------------
+# Section 2.5: 🎯 목표 대비 성과 비교 (Target Achievement Rate)
+# ----------------------------------------------------
+st.markdown("### 🎯 **목표 대비 성과 달성 현황 (Target Achievement Rate)**")
+
+# Calculate Aggregates for Targets
+target_spend = filtered_df['목표 광고비'].sum() if '목표 광고비' in filtered_df.columns else 0
+target_rev = filtered_df['목표 결제금액'].sum() if '목표 결제금액' in filtered_df.columns else 0
+target_orders = filtered_df['목표 결제건수'].sum() if '목표 결제건수' in filtered_df.columns else 0
+
+actual_spend = curr_spend
+actual_rev = curr_rev
+actual_orders = filtered_df['결제건수'].sum() if '결제건수' in filtered_df.columns else 0
+
+rate_spend = (actual_spend / target_spend * 100) if target_spend > 0 else 0.0
+rate_rev = (actual_rev / target_rev * 100) if target_rev > 0 else 0.0
+rate_orders = (actual_orders / target_orders * 100) if target_orders > 0 else 0.0
+
+ach_col1, ach_col2, ach_col3 = st.columns(3)
+
+with ach_col1:
+    st.metric(
+        label="🎯 광고비 달성률 (집행/목표)",
+        value=f"{rate_spend:.1f} %",
+        delta=f"실제 ₩{actual_spend:,.0f} / 목표 ₩{target_spend:,.0f}"
+    )
+
+with ach_col2:
+    st.metric(
+        label="🎯 결제거래액 달성률 (실제/목표)",
+        value=f"{rate_rev:.1f} %",
+        delta=f"실제 ₩{actual_rev:,.0f} / 목표 ₩{target_rev:,.0f}"
+    )
+
+with ach_col3:
+    st.metric(
+        label="🎯 결제건수 달성률 (실제/목표)",
+        value=f"{rate_orders:.1f} %",
+        delta=f"실제 {actual_orders:,.0f}건 / 목표 {target_orders:,.0f}건"
+    )
+
+# Achievement Horizontal Bar Chart
+achievement_data = pd.DataFrame({
+    '지표': ['광고비 달성률', '결제거래액 달성률', '결제건수 달성률'],
+    '달성률': [rate_spend, rate_rev, rate_orders],
+    '실제값': [f"₩{actual_spend:,.0f}", f"₩{actual_rev:,.0f}", f"{actual_orders:,.0f}건"],
+    '목표값': [f"₩{target_spend:,.0f}", f"₩{target_rev:,.0f}", f"{target_orders:,.0f}건"]
+})
+
+fig_ach = go.Figure()
+
+# Add Horizontal Bars
+colors = ['#00C853' if r >= 100 else '#FF9100' for r in achievement_data['달성률']]
+
+fig_ach.add_trace(go.Bar(
+    y=achievement_data['지표'],
+    x=achievement_data['달성률'],
+    orientation='h',
+    marker_color=colors,
+    text=[f" {r:.1f}% (실제: {act} / 목표: {tgt})" for r, act, tgt in zip(achievement_data['달성률'], achievement_data['실제값'], achievement_data['목표값'])],
+    textposition='auto',
+    hovertemplate="<b>%{y}</b><br>달성률: %{x:.1f}%<br>실제값: %{customdata[0]}<br>목표값: %{customdata[1]}<extra></extra>",
+    customdata=achievement_data[['실제값', '목표값']]
+))
+
+# 100% Target Reference Line
+fig_ach.add_vline(
+    x=100,
+    line_dash="dash",
+    line_color="#E61E25",
+    line_width=2.5,
+    annotation_text="🎯 목표 100%",
+    annotation_position="top right"
+)
+
+fig_ach.update_layout(
+    template="plotly_white",
+    height=280,
+    margin=dict(l=20, r=40, t=35, b=20),
+    xaxis=dict(title="달성률 (%)", showgrid=True, gridcolor="#F1F3F5", range=[0, max(120, achievement_data['달성률'].max() * 1.25)]),
+    yaxis=dict(showgrid=False)
+)
+
+st.plotly_chart(fig_ach, use_container_width=True)
+
+st.markdown("---")
+
+# ----------------------------------------------------
 # Section 3: 데일리 성과 추이 그래프 (시계열)
 # ----------------------------------------------------
 st.markdown("### 📈 **데일리 성과 추이 분석**")

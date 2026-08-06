@@ -120,9 +120,20 @@ except Exception as e:
     st.error(f"데이터 파일을 불러오지 못했습니다. 경로와 인코딩을 확인하세요. 에러: {str(e)}")
     st.stop()
 
-# 3. Sidebar Configuration (Filters & API Keys)
-st.sidebar.image("https://img.icons8.com/color/96/000000/analytics.png", width=60)
-st.sidebar.markdown("### **AI Performance Hub Settings**")
+# 3. Sidebar Configuration (Logo & Title)
+st.sidebar.markdown("""
+<div style="margin-bottom: 20px; background: linear-gradient(135deg, #FF1744 0%, #D50000 100%); padding: 16px; border-radius: 14px; box-shadow: 0 4px 15px rgba(213, 0, 0, 0.25); text-align: center;">
+    <div style="display: inline-flex; align-items: center; justify-content: center; background: #FFFFFF; border-radius: 10px; padding: 6px 16px; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);">
+        <span style="font-family: 'Arial Black', sans-serif; font-weight: 900; color: #D50000; font-size: 1.6rem; letter-spacing: -1.5px; font-style: italic;">11st</span>
+    </div>
+    <div style="color: #FFFFFF; font-weight: 800; font-size: 1.15rem; letter-spacing: -0.5px; line-height: 1.3;">
+        eMnetX11번가 SA 대시보드
+    </div>
+    <div style="color: rgba(255, 255, 255, 0.85); font-size: 0.78rem; margin-top: 4px; font-weight: 500;">
+        Performance Marketing Analytics
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # Gemini API Key Input
 gemini_key = st.sidebar.text_input(
